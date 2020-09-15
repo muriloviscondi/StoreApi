@@ -39,7 +39,7 @@ namespace APIStory.Controllers
     public async Task<ActionResult<BuyProduct>> GetBuyProduct(int id)
     {
       var buyProduct = await _context.BuyProducts.FindAsync(id);
-      
+
       if (buyProduct == null)
       {
         return NotFound();
@@ -52,17 +52,51 @@ namespace APIStory.Controllers
     [HttpPut("update/{id}")]
     public async Task<IActionResult> PutBuyProduct(int id, BuyProduct buyProduct)
     {
-      var data = _context.BuyProducts.FindAsync(id);
+      var data = _context.BuyProducts.Find(id);
+      var product = _context.Products.Find(data.ProductId);
 
       if (id != buyProduct.BuyProductId)
       {
         return BadRequest();
       }
 
+      if (data.Quantity > buyProduct.Quantity)
+      {
+        int differenceStock = data.Quantity - buyProduct.Quantity;
+        product.Stock += differenceStock;
+      }
+
+      if (data.Quantity < buyProduct.Quantity)
+      {
+        int differenceStock = buyProduct.Quantity - data.Quantity;
+
+        if (product.Stock < differenceStock)
+        {
+          return BadRequest();
+        } 
+        else
+        {
+        product.Stock += differenceStock;
+        }
+      }
+
+      data.BuyProductId = id;
+      data.Quantity = buyProduct.Quantity;
+      data.Code = buyProduct.Code;
+      data.UnitaryValue = buyProduct.UnitaryValue;
+      data.Total = buyProduct.UnitaryValue * product.Price;
+      data.RegistrationDate = data.RegistrationDate;
+      data.UpdateDate = DateTime.Now;
+      data.UserId = data.UserId;
+      data.ProductId = buyProduct.ProductId;
       _context.Entry(buyProduct).State = EntityState.Modified;
 
       try
       {
+        _context.BuyProducts.Update(buyProduct);
+        await _context.SaveChangesAsync();
+
+        _context.Products.Update(product);
         await _context.SaveChangesAsync();
       }
       catch (DbUpdateConcurrencyException)
@@ -84,7 +118,7 @@ namespace APIStory.Controllers
     [HttpPost("create")]
     public async Task<ActionResult<BuyProduct>> PostBuyProduct(BuyProduct buyProduct)
     {
-      var products = _context.Products.Find(buyProduct.ProductId) ;
+      var products = _context.Products.Find(buyProduct.ProductId);
 
       if (products.Stock < buyProduct.Quantity)
       {
